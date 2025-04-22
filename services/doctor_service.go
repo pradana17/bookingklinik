@@ -1,0 +1,71 @@
+package services
+
+import (
+	"booking-klinik/model"
+	"booking-klinik/repository"
+	"errors"
+)
+
+type DoctorServices interface {
+	CreateDoctor(doctor model.Doctor) (*model.Doctor, error)
+	GetAllDoctors(limit, offset int) ([]model.Doctor, error)
+	GetDoctorById(id uint) (*model.Doctor, error)
+	UpdateDoctor(doctorID uint, doctor model.Doctor) (*model.Doctor, error)
+	DeleteDoctor(doctorID uint) error
+}
+
+type DoctorServicesImpl struct {
+	DoctorRepository repository.DoctorRepository
+	UserRepository   repository.UserRepository
+}
+
+func (s *DoctorServicesImpl) CreateDoctor(doctor model.Doctor) (*model.Doctor, error) {
+	user, err := s.UserRepository.GetUserById(doctor.UserId)
+	if err != nil || user == nil {
+		return nil, errors.New("user not found")
+	}
+
+	if doctor.Specialization == "" {
+		return nil, errors.New("specialization is required")
+	}
+
+	if err := s.DoctorRepository.CreateDoctor(&doctor); err != nil {
+		return nil, err
+	}
+
+	return &doctor, nil
+}
+
+func (s *DoctorServicesImpl) GetAllDoctors(limit, offset int) ([]model.Doctor, error) {
+	doctor, err := s.DoctorRepository.GetAllDoctors(limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	return doctor, nil
+}
+
+func (s *DoctorServicesImpl) GetDoctorById(id uint) (*model.Doctor, error) {
+	doctor, err := s.DoctorRepository.GetDoctorById(id)
+	if err != nil {
+		return nil, err
+	}
+	return doctor, nil
+}
+
+func (s *DoctorServicesImpl) UpdateDoctor(doctorID uint, doctor model.Doctor) (*model.Doctor, error) {
+
+	updatedDoctor, err := s.DoctorRepository.UpdateDoctor(doctorID, doctor)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedDoctor, nil
+}
+
+func (s *DoctorServicesImpl) DeleteDoctor(doctorID uint) error {
+	err := s.DoctorRepository.DeleteDoctor(doctorID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
