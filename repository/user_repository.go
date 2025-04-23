@@ -10,6 +10,7 @@ type UserRepository interface {
 	CreateUser(user *model.User) error
 	GetUserByEmail(email string) (*model.User, error)
 	GetUserById(id uint) (*model.User, error)
+	UpdatePassword(userID uint, newPassword string) error
 }
 
 type UserRepositoryImpl struct {
@@ -34,4 +35,11 @@ func (r *UserRepositoryImpl) GetUserById(id uint) (*model.User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *UserRepositoryImpl) UpdatePassword(userID uint, newPassword string) error {
+	if err := r.DB.Model(&model.User{}).Where("id = ?", userID).Update("password", newPassword).Error; err != nil {
+		return err
+	}
+	return nil
 }

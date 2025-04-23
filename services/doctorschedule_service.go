@@ -12,7 +12,7 @@ type DoctorScheduleService interface {
 	GetAllDoctorSchedules(limit, offset int) ([]model.DoctorSchedule, error)
 	GetDoctorScheduleById(scheduleId uint) (*model.DoctorSchedule, error)
 	UpdateDoctorSchedule(scheduleID uint, doctorSchedule model.DoctorSchedule) (*model.DoctorSchedule, error)
-	DeleteDoctorSchedule(scheduleID uint) error
+	DeleteDoctorSchedule(scheduleID uint, userID uint) error
 }
 
 type DoctorScheduleServiceImpl struct {
@@ -30,14 +30,13 @@ func (ds *DoctorScheduleServiceImpl) CreateDoctorSchedule(doctorSchedule model.D
 	}
 
 	for _, existing := range existingSchedule {
-		if existing.Day == doctorSchedule.Day {
+		if existing.Date == doctorSchedule.Date {
 			existingStart, existingEnd := existing.StartTime, existing.EndTime
 			newStart, newEnd := doctorSchedule.StartTime, doctorSchedule.EndTime
 
-			if (newStart < existingEnd && newEnd > existingStart) || (existingStart < newEnd && existingEnd > newStart) {
+			if (newStart.Before(existingEnd) && newEnd.After(existingStart)) || (existingStart.Before(newEnd) && existingEnd.After(newStart)) {
 				return nil, errors.New("doctor schedule already exists")
 			}
-
 		}
 	}
 
@@ -64,11 +63,11 @@ func (ds *DoctorScheduleServiceImpl) UpdateDoctorSchedule(scheduleID uint, docto
 	}
 
 	for _, existing := range existingSchedule {
-		if existing.Day == doctorSchedule.Day {
+		if existing.Date == doctorSchedule.Date {
 			existingStart, existingEnd := existing.StartTime, existing.EndTime
 			newStart, newEnd := doctorSchedule.StartTime, doctorSchedule.EndTime
 
-			if (newStart < existingEnd && newEnd > existingStart) || (existingStart < newEnd && existingEnd > newStart) {
+			if (newStart.Before(existingEnd) && newEnd.After(existingStart)) || (existingStart.Before(newEnd) && existingEnd.After(newStart)) {
 				return nil, errors.New("doctor schedule already exists")
 			}
 
@@ -82,8 +81,8 @@ func (ds *DoctorScheduleServiceImpl) UpdateDoctorSchedule(scheduleID uint, docto
 	return &doctorSchedule, nil
 }
 
-func (ds *DoctorScheduleServiceImpl) DeleteDoctorSchedule(scheduleID uint) error {
-	err := ds.DoctorScheduleRepository.DeleteDoctorSchedule(scheduleID)
+func (ds *DoctorScheduleServiceImpl) DeleteDoctorSchedule(scheduleID uint, userID uint) error {
+	err := ds.DoctorScheduleRepository.DeleteDoctorSchedule(scheduleID, userID)
 	if err != nil {
 		return err
 	}

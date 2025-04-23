@@ -20,6 +20,12 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.POST("/register", userController.RegisterUser)
 	r.POST("/login", userController.LoginUser)
 
+	userGroup := r.Group("/user")
+	userGroup.Use(middleware.AuthMiddleware())
+	{
+		userGroup.PUT("/password", userController.UpdatePassword)
+	}
+
 	//Booking Routes
 	bookingRepository := &repository.BookingRepositoryImpl{DB: db}
 	bookingService := &services.BookingServicesImpl{BookingRepository: bookingRepository}
@@ -64,5 +70,24 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		doctorScheduleGroup.PUT("/:id", doctorScheduleController.UpdateDoctorSchedule)
 		doctorScheduleGroup.DELETE("/:id", doctorScheduleController.DeleteDoctorSchedule)
 	}
+
+	//Service Routes
+	serviceRepository := &repository.ServiceRepositoryImpl{DB: db}
+	serviceService := &services.ServiceServiceImpl{ServiceRepository: serviceRepository}
+	serviceController := &controllers.ServiceController{ServiceService: serviceService}
+
+	serviceGroup := r.Group("/service")
+	serviceGroup.Use(middleware.AuthMiddleware())
+	{
+		serviceGroup.GET("/", serviceController.GetAllServices)
+		serviceGroup.GET("/:id", serviceController.GetServiceById)
+		serviceGroup.Use(middleware.RoleCheckMiddleware("admin"))
+		{
+			serviceGroup.POST("/", serviceController.CreateService)
+			serviceGroup.PUT("/:id", serviceController.UpdateService)
+			serviceGroup.DELETE("/:id", serviceController.DeleteService)
+		}
+	}
+
 	return r
 }

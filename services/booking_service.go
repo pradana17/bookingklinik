@@ -4,6 +4,7 @@ import (
 	"booking-klinik/model"
 	"booking-klinik/repository"
 	"errors"
+	"fmt"
 )
 
 type BookingService interface {
@@ -17,15 +18,53 @@ type BookingService interface {
 }
 
 type BookingServicesImpl struct {
-	BookingRepository repository.BookingRepository
+	BookingRepository        repository.BookingRepository
+	DoctorRepository         repository.DoctorRepository
+	ServiceRepository        repository.ServiceRepository
+	DoctorScheduleRepository repository.DoctorScheduleRepository
 }
 
 func (s *BookingServicesImpl) CreateBooking(booking model.Booking) (*model.Booking, error) {
-	err := s.BookingRepository.CreateBooking(&booking)
+	// Validate the booking
+	_, err := s.DoctorRepository.GetDoctorById(booking.DoctorId)
 	if err != nil {
+		return nil, errors.New("doctor not found")
+	}
+	service, err := s.ServiceRepository.GetServiceById(booking.ServiceId)
+	if err != nil || !service.IsActive {
+		return nil, errors.New("service is inactive or not found")
+	}
+
+	schedules, err := s.DoctorScheduleRepository.GetDoctorSchedulesByDoctorId(booking.DoctorId)
+	if err != nil {
+		return nil, errors.New("doctor schedule not found")
+	}
+
+	for _, schedule := range schedules {
+		if schedule.Date == booking.BookingDate {
+			return nil, errors.New("doctor is not available at this date")
+		}
+		if booking.BookingTime.Before(schedule.StartTime) && booking.BookingTime.After(schedule.EndTime) {
+			return nil, errors.New("booking time is outside doctor's available hours")
+		}
+	}
+
+	conflict, nextAvailableTime, err := s.BookingRepository.CheckBookingConflict(booking.DoctorId, booking.BookingDate, booking.BookingTime, service.DurationMinutes)
+	if err != nil {
+		return nil, errors.New("error checking booking conflict")
+	}
+
+	if conflict {
+		return nil, fmt.Errorf("doctor is already booked at this time. Next available slot starts from %s", nextAvailableTime)
+	}
+
+	// Create the booking
+	if err := s.BookingRepository.CreateBooking(&booking); err != nil {
 		return nil, err
 	}
+
 	return &booking, nil
+
 }
 
 func (s *BookingServicesImpl) GetAllBookings(limit, offset int) ([]model.Booking, error) {
@@ -60,10 +99,10 @@ func (s *BookingServicesImpl) UpdateBooking(bookingID uint, booking model.Bookin
 
 	if userRole == "patient" {
 		existingBooking.Notes = booking.Notes
-		if booking.BookingTime != "" {
+		if !booking.BookingTime.IsZero() {
 			existingBooking.BookingTime = booking.BookingTime
 		}
-		if booking.BookingDate != "" {
+		if !booking.BookingDate.IsZero() {
 			existingBooking.BookingDate = booking.BookingDate
 		}
 	} else if userRole == "doctor" || userRole == "admin" {
@@ -71,6 +110,7 @@ func (s *BookingServicesImpl) UpdateBooking(bookingID uint, booking model.Bookin
 		existingBooking.Notes = booking.Notes
 	}
 
+	existingBooking.UpdatedBy = booking.UserId
 	existingBooking, err = s.BookingRepository.UpdateBooking(bookingID, *existingBooking)
 	if err != nil {
 		return nil, err

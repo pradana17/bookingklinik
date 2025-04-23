@@ -12,7 +12,7 @@ type DoctorScheduleRepository interface {
 	GetDoctorSchedulesById(scheduleId uint) (*model.DoctorSchedule, error)
 	GetAllDoctorSchedules(limit, offset int) ([]model.DoctorSchedule, error)
 	UpdateDoctorSchedule(doctorSchedule *model.DoctorSchedule) error
-	DeleteDoctorSchedule(scheduleId uint) error
+	DeleteDoctorSchedule(scheduleId uint, userID uint) error
 }
 
 type DoctorScheduleRepositoryImpl struct {
@@ -51,7 +51,7 @@ func (r *DoctorScheduleRepositoryImpl) UpdateDoctorSchedule(doctorSchedule *mode
 		return err
 	}
 
-	existingDoctorSchedule.Day = doctorSchedule.Day
+	existingDoctorSchedule.Date = doctorSchedule.Date
 	existingDoctorSchedule.StartTime = doctorSchedule.StartTime
 	existingDoctorSchedule.EndTime = doctorSchedule.EndTime
 	existingDoctorSchedule.UpdatedBy = doctorSchedule.Doctor.User.ID
@@ -66,11 +66,18 @@ func (r *DoctorScheduleRepositoryImpl) UpdateDoctorSchedule(doctorSchedule *mode
 	return nil
 }
 
-func (r *DoctorScheduleRepositoryImpl) DeleteDoctorSchedule(scheduleId uint) error {
+func (r *DoctorScheduleRepositoryImpl) DeleteDoctorSchedule(scheduleId uint, userID uint) error {
 	var doctorSchedule model.DoctorSchedule
 	tx := r.DB.Begin()
 
 	if err := tx.First(&doctorSchedule, scheduleId).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	doctorSchedule.UpdatedBy = userID
+
+	if err := tx.Save(&doctorSchedule).Error; err != nil {
 		tx.Rollback()
 		return err
 	}

@@ -13,3 +13,11 @@ type Service struct {
 	UpdatedBy       uint      `json:"updated_by"`
 	Bookings        []Booking `json:"-" gorm:"foreignKey:ServiceId;references:ID"`
 }
+
+type ServiceResponse struct {
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	Price           int    `json:"price"`
+	DurationMinutes int    `json:"duration_minutes"`
+	IsActive        bool   `json:"is_active"`
+}

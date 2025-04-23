@@ -22,6 +22,8 @@ func (dsc *DoctorScheduleController) CreateDoctorSchedule(c *gin.Context) {
 		return
 	}
 
+	userID := c.MustGet("userID").(uint)
+	doctorSchedule.CreatedBy = userID
 	createdDoctorSchedule, err := dsc.DoctorScheduleService.CreateDoctorSchedule(doctorSchedule)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -49,7 +51,7 @@ func (dsc *DoctorScheduleController) GetAllDoctorSchedules(c *gin.Context) {
 		doctorScheduleResponses = append(doctorScheduleResponses, model.DoctorScheduleResponse{
 			ID:        doctorSchedule.ID,
 			DoctorID:  doctorSchedule.Doctor.ID,
-			Day:       doctorSchedule.Day,
+			Date:      doctorSchedule.Date,
 			StartTime: doctorSchedule.StartTime,
 			EndTime:   doctorSchedule.EndTime,
 		})
@@ -90,9 +92,10 @@ func (dsc *DoctorScheduleController) UpdateDoctorSchedule(c *gin.Context) {
 	}
 
 	doctorSchedule, err := dsc.DoctorScheduleService.UpdateDoctorSchedule(uint(doctorScheduleIdUint), model.DoctorSchedule{
-		Day:       updateRequest.Day,
+		Date:      updateRequest.Date,
 		StartTime: updateRequest.StartTime,
 		EndTime:   updateRequest.EndTime,
+		UpdatedBy: c.MustGet("userID").(uint),
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -104,13 +107,14 @@ func (dsc *DoctorScheduleController) UpdateDoctorSchedule(c *gin.Context) {
 
 func (dsc *DoctorScheduleController) DeleteDoctorSchedule(c *gin.Context) {
 	doctorScheduleId := c.Param("id")
+	userID := c.MustGet("userID").(uint)
 	doctorScheduleIdUint, err := strconv.ParseUint(doctorScheduleId, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid doctor schedule ID"})
 		return
 	}
 
-	err = dsc.DoctorScheduleService.DeleteDoctorSchedule(uint(doctorScheduleIdUint))
+	err = dsc.DoctorScheduleService.DeleteDoctorSchedule(uint(doctorScheduleIdUint), userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

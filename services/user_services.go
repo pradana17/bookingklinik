@@ -10,6 +10,7 @@ import (
 type UserService interface {
 	RegisterUser(user *model.User) (*model.User, error)
 	LoginUser(email, password string) (*model.User, string, error)
+	UpdatePassword(userID uint, OldPassword, newPassword string) error
 }
 
 type UserServicesImpl struct {
@@ -54,4 +55,27 @@ func (s *UserServicesImpl) LoginUser(email, password string) (*model.User, strin
 	}
 
 	return user, token, nil
+}
+
+func (s *UserServicesImpl) UpdatePassword(userID uint, OldPassword, newPassword string) error {
+	user, err := s.UserRepository.GetUserById(userID)
+	if err != nil {
+		return err
+	}
+
+	if !utils.CheckPassword(OldPassword, user.Password) {
+		return errors.New("old password is incorrect")
+	}
+
+	hashedPassword, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+
+	user.Password = hashedPassword
+	if err := s.UserRepository.UpdatePassword(userID, newPassword); err != nil {
+		return err
+	}
+
+	return nil
 }

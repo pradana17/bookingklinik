@@ -1,6 +1,10 @@
 package model
 
-import "gorm.io/gorm"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Doctor struct {
 	gorm.Model
@@ -15,13 +19,13 @@ type Doctor struct {
 
 type DoctorSchedule struct {
 	gorm.Model
-	DoctorId  uint   `json:"doctor_id" gorm:"not null"`
-	Day       string `json:"day" gorm:"not null"`
-	StartTime string `json:"start_time" gorm:"not null"`
-	EndTime   string `json:"end_time" gorm:"not null"`
-	CreatedBy uint   `json:"created_by" gorm:"not null"`
-	UpdatedBy uint   `json:"updated_by"`
-	Doctor    Doctor `json:"-" gorm:"foreignKey:DoctorId;references:ID"`
+	DoctorId  uint      `json:"doctor_id" gorm:"not null"`
+	Date      time.Time `json:"date" time_format:"2006-01-02" gorm:"not null;index;uniqueIndex:idx_doctorschedule_date"`
+	StartTime time.Time `json:"start_time" time_format:"15:04" gorm:"not null"`
+	EndTime   time.Time `json:"end_time" time_format:"15:04" gorm:"not null"`
+	CreatedBy uint      `json:"created_by" gorm:"not null"`
+	UpdatedBy uint      `json:"updated_by"`
+	Doctor    Doctor    `json:"-" gorm:"foreignKey:DoctorId;references:ID"`
 }
 
 type DoctorResponse struct {
@@ -31,15 +35,15 @@ type DoctorResponse struct {
 }
 
 type DoctorScheduleResponse struct {
-	ID        uint   `json:"id"`
-	DoctorID  uint   `json:"doctor_id"`
-	Day       string `json:"day"`
-	StartTime string `json:"start_time"`
-	EndTime   string `json:"end_time"`
+	ID        uint      `json:"id"`
+	DoctorID  uint      `json:"doctor_id"`
+	Date      time.Time `json:"date" time_format:"2006-01-02"`
+	StartTime time.Time `json:"start_time" time_format:"15:04"`
+	EndTime   time.Time `json:"end_time" time_format:"15:04"`
 }
 
 type DoctorScheduleRequest struct {
-	Day       string `json:"day"`
-	StartTime string `json:"start_time" `
-	EndTime   string `json:"end_time" `
+	Date      time.Time `json:"date" time_format:"2006-01-02"`
+	StartTime time.Time `json:"start_time" time_format:"15:04"`
+	EndTime   time.Time `json:"end_time" time_format:"15:04"`
 }
