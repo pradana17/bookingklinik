@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"booking-klinik/utils"
+	"fmt"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -12,15 +13,15 @@ func AuthMiddleware() gin.HandlerFunc {
 		// TODO: implement authentication middleware
 		tokenString := c.GetHeader("Authorization")
 		tokenString = strings.TrimPrefix(tokenString, "Bearer ")
-
 		claims, err := utils.VerifyJWT(tokenString)
 		if err != nil {
-			c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+			c.AbortWithStatusJSON(401, gin.H{"error": "Invalid token"})
 			return
 		}
 
+		fmt.Println(claims.Email, claims.UserID, claims.Role)
 		c.Set("email", claims.Email)
-		c.Set("userID", claims.UserId)
+		c.Set("userID", claims.UserID)
 		c.Set("role", claims.Role)
 		c.Next()
 	}
@@ -28,10 +29,10 @@ func AuthMiddleware() gin.HandlerFunc {
 
 func RoleCheckMiddleware(allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		role, exist := c.Get("role")
-		if !exist {
-			c.AbortWithStatusJSON(401, gin.H{"error": "Role is required"})
-			return
+		role, exists := c.Get("role")
+		fmt.Println(role)
+		if !exists {
+			c.AbortWithStatusJSON(403, gin.H{"error": "Role not found"})
 		}
 
 		roleStr := role.(string)

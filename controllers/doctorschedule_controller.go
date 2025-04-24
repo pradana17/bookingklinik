@@ -6,6 +6,7 @@ import (
 	"booking-klinik/utils"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,16 +16,42 @@ type DoctorScheduleController struct {
 }
 
 func (dsc *DoctorScheduleController) CreateDoctorSchedule(c *gin.Context) {
-	var doctorSchedule model.DoctorSchedule
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	time.Local = loc
+	var doctorScheduleRequest model.DoctorScheduleRequest
 
-	if err := c.ShouldBindJSON(&doctorSchedule); err != nil {
+	if err := c.ShouldBindJSON(&doctorScheduleRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	date, err := time.ParseInLocation("2006-01-02", doctorScheduleRequest.Date, loc)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format"})
+		return
+	}
+	startTime, err := time.ParseInLocation("2006-01-02 15:04", doctorScheduleRequest.Date+" "+doctorScheduleRequest.StartTime, loc)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start time format"})
+		return
+	}
+	endTime, err := time.ParseInLocation("2006-01-02 15:04", doctorScheduleRequest.Date+" "+doctorScheduleRequest.EndTime, loc)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end time format"})
+		return
+	}
+
 	userID := c.MustGet("userID").(uint)
-	doctorSchedule.CreatedBy = userID
-	createdDoctorSchedule, err := dsc.DoctorScheduleService.CreateDoctorSchedule(doctorSchedule)
+
+	schedule := model.DoctorSchedule{
+		DoctorId:  doctorScheduleRequest.DoctorID,
+		ServiceId: doctorScheduleRequest.ServiceID,
+		Date:      date,
+		StartTime: startTime,
+		EndTime:   endTime,
+		CreatedBy: userID,
+	}
+	createdDoctorSchedule, err := dsc.DoctorScheduleService.CreateDoctorSchedule(schedule)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -78,6 +105,8 @@ func (dsc *DoctorScheduleController) GetDoctorScheduleById(c *gin.Context) {
 }
 
 func (dsc *DoctorScheduleController) UpdateDoctorSchedule(c *gin.Context) {
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	time.Local = loc
 	doctorScheduleId := c.Param("id")
 	doctorScheduleIdUint, err := strconv.ParseUint(doctorScheduleId, 10, 32)
 	if err != nil {
@@ -91,10 +120,26 @@ func (dsc *DoctorScheduleController) UpdateDoctorSchedule(c *gin.Context) {
 		return
 	}
 
+	date, err := time.ParseInLocation("2006-01-02", updateRequest.Date, loc)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format"})
+		return
+	}
+	startTime, err := time.ParseInLocation("2006-01-02 15:04", updateRequest.Date+" "+updateRequest.StartTime, loc)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid start time format"})
+		return
+	}
+	endTime, err := time.ParseInLocation("2006-01-02 15:04", updateRequest.Date+" "+updateRequest.EndTime, loc)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid end time format"})
+		return
+	}
+
 	doctorSchedule, err := dsc.DoctorScheduleService.UpdateDoctorSchedule(uint(doctorScheduleIdUint), model.DoctorSchedule{
-		Date:      updateRequest.Date,
-		StartTime: updateRequest.StartTime,
-		EndTime:   updateRequest.EndTime,
+		Date:      date,
+		StartTime: startTime,
+		EndTime:   endTime,
 		UpdatedBy: c.MustGet("userID").(uint),
 	})
 	if err != nil {

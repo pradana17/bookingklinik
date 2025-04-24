@@ -28,6 +28,7 @@ func (s *ServiceServiceImpl) CreateService(service model.Service) (*model.Servic
 		return nil, errors.New("service price and duration minutes must be greater than 0")
 	}
 
+	service.IsActive = true
 	if err := s.ServiceRepository.CreateService(&service); err != nil {
 		return nil, err
 	}

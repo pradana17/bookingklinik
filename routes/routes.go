@@ -15,6 +15,11 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	//User Routes
 	userRepository := &repository.UserRepositoryImpl{DB: db}
+	serviceRepository := &repository.ServiceRepositoryImpl{DB: db}
+	doctorScheduleRepository := &repository.DoctorScheduleRepositoryImpl{DB: db}
+	bookingRepository := &repository.BookingRepositoryImpl{DB: db}
+	doctorRepository := &repository.DoctorRepositoryImpl{DB: db}
+
 	userService := &services.UserServicesImpl{UserRepository: userRepository}
 	userController := &controllers.UserController{UserService: userService}
 	r.POST("/register", userController.RegisterUser)
@@ -27,8 +32,12 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	}
 
 	//Booking Routes
-	bookingRepository := &repository.BookingRepositoryImpl{DB: db}
-	bookingService := &services.BookingServicesImpl{BookingRepository: bookingRepository}
+
+	bookingService := &services.BookingServicesImpl{
+		BookingRepository:        bookingRepository,
+		DoctorRepository:         doctorRepository,
+		ServiceRepository:        serviceRepository,
+		DoctorScheduleRepository: doctorScheduleRepository}
 	bookingController := &controllers.BookingController{BookingService: bookingService}
 
 	bookingGroup := r.Group("/booking")
@@ -44,11 +53,13 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	}
 
 	//Doctor Routes
-	doctorRepository := &repository.DoctorRepositoryImpl{DB: db}
-	doctorService := &services.DoctorServicesImpl{DoctorRepository: doctorRepository}
+
+	doctorService := &services.DoctorServicesImpl{
+		DoctorRepository: doctorRepository,
+		UserRepository:   userRepository}
 	doctorController := &controllers.DoctorController{DoctorService: doctorService}
 	doctorGroup := r.Group("/doctor")
-	doctorGroup.Use(middleware.RoleCheckMiddleware("admin", "doctor"), middleware.AuthMiddleware())
+	doctorGroup.Use(middleware.AuthMiddleware(), middleware.RoleCheckMiddleware("admin", "doctor"))
 	{
 		doctorGroup.POST("/", doctorController.CreateDoctor)
 		doctorGroup.GET("/", doctorController.GetAllDoctors)
@@ -58,11 +69,11 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	}
 
 	//Doctor Schedule Routes
-	doctorScheduleRepository := &repository.DoctorScheduleRepositoryImpl{DB: db}
-	doctorScheduleService := &services.DoctorScheduleServiceImpl{DoctorScheduleRepository: doctorScheduleRepository}
+
+	doctorScheduleService := &services.DoctorScheduleServiceImpl{DoctorScheduleRepository: doctorScheduleRepository, DoctorRepository: doctorRepository, ServiceRepository: serviceRepository}
 	doctorScheduleController := &controllers.DoctorScheduleController{DoctorScheduleService: doctorScheduleService}
 	doctorScheduleGroup := r.Group("/doctorschedule")
-	doctorScheduleGroup.Use(middleware.RoleCheckMiddleware("admin", "doctor"), middleware.AuthMiddleware())
+	doctorScheduleGroup.Use(middleware.AuthMiddleware(), middleware.RoleCheckMiddleware("admin", "doctor"))
 	{
 		doctorScheduleGroup.POST("/", doctorScheduleController.CreateDoctorSchedule)
 		doctorScheduleGroup.GET("/", doctorScheduleController.GetAllDoctorSchedules)
@@ -72,7 +83,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	}
 
 	//Service Routes
-	serviceRepository := &repository.ServiceRepositoryImpl{DB: db}
+
 	serviceService := &services.ServiceServiceImpl{ServiceRepository: serviceRepository}
 	serviceController := &controllers.ServiceController{ServiceService: serviceService}
 

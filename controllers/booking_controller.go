@@ -6,6 +6,7 @@ import (
 	"booking-klinik/utils"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,9 +16,23 @@ type BookingController struct {
 }
 
 func (bc *BookingController) CreateBooking(c *gin.Context) {
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	time.Local = loc
 	var bookingRequest model.BookingRequest
 	if err := c.ShouldBindJSON(&bookingRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	bookingDate, err := time.ParseInLocation("2006-01-02", bookingRequest.BookingDate, loc)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid date format"})
+		return
+	}
+
+	bookingTime, err := time.ParseInLocation("2006-01-02 15:04", bookingRequest.BookingDate+" "+bookingRequest.BookingTime, loc)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid time format"})
 		return
 	}
 
@@ -27,8 +42,8 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 		UserId:      userID,
 		DoctorId:    bookingRequest.DoctorId,
 		ServiceId:   bookingRequest.ServiceId,
-		BookingDate: bookingRequest.BookingDate,
-		BookingTime: bookingRequest.BookingTime,
+		BookingDate: bookingDate,
+		BookingTime: bookingTime,
 		Status:      "pending",
 		Notes:       bookingRequest.Notes,
 		CreatedBy:   userID,
@@ -61,7 +76,7 @@ func (bc *BookingController) GetAllBookings(c *gin.Context) {
 		return
 	}
 
-	bookings, err := bc.BookingService.GetAllBookings(paginator.Limit, paginator.Offset)
+	bookings, pagination, err := bc.BookingService.GetAllBookings(paginator.Limit, paginator.Offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -80,7 +95,12 @@ func (bc *BookingController) GetAllBookings(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"bookings": bookingResponses})
+	c.JSON(http.StatusOK, gin.H{
+		"data":         bookingResponses,
+		"total_rows":   pagination.TotalRows,
+		"total_pages":  pagination.TotalPages,
+		"current_page": pagination.Page,
+		"limit":        pagination.Limit})
 }
 
 func (bc *BookingController) GetBookingsById(c *gin.Context) {

@@ -25,6 +25,11 @@ func (r *DoctorScheduleRepositoryImpl) CreateDoctorSchedule(doctorSchedule *mode
 		tx.Rollback()
 		return err
 	}
+	if err := tx.Preload("Doctor").Preload("Service").First(doctorSchedule, doctorSchedule.ID).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
 	tx.Commit()
 	return nil
 }

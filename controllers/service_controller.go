@@ -22,8 +22,11 @@ func (sc *ServiceController) CreateService(c *gin.Context) {
 		return
 	}
 
+	//Default isActive = true
+
 	userID := c.MustGet("userID").(uint)
 	service.CreatedBy = userID
+	service.IsActive = true
 	createdService, err := sc.ServiceService.CreateService(service)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

@@ -18,7 +18,14 @@ type UserRepositoryImpl struct {
 }
 
 func (r *UserRepositoryImpl) CreateUser(user *model.User) error {
-	return r.DB.Create(user).Error
+	tx := r.DB.Begin()
+	defer tx.Commit()
+
+	if err := tx.Create(user).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	return nil
 }
 
 func (r *UserRepositoryImpl) GetUserByEmail(email string) (*model.User, error) {
@@ -38,7 +45,18 @@ func (r *UserRepositoryImpl) GetUserById(id uint) (*model.User, error) {
 }
 
 func (r *UserRepositoryImpl) UpdatePassword(userID uint, newPassword string) error {
-	if err := r.DB.Model(&model.User{}).Where("id = ?", userID).Update("password", newPassword).Error; err != nil {
+
+	tx := r.DB.Begin()
+	defer tx.Commit()
+	var user model.User
+	if err := tx.First(&user, userID).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	user.Password = newPassword
+	user.UpdatedBy = userID
+	if err := tx.Save(&user).Error; err != nil {
+		tx.Rollback()
 		return err
 	}
 	return nil

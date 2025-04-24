@@ -3,12 +3,15 @@ package main
 import (
 	"booking-klinik/config"
 	"booking-klinik/routes"
+	"time"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
 
+	loc, _ := time.LoadLocation("Asia/Jakarta")
+	time.Local = loc
 	err := godotenv.Load(".env")
 
 	if err != nil {

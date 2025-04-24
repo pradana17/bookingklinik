@@ -11,7 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func GenerateJWT(email model.User) (string, error) {
+func GenerateJWT(user model.User) (string, error) {
 	var jwtSecret = os.Getenv("JWT_SECRET_KEY")
 	var jwtExpiresIn = os.Getenv("JWT_EXPIRES_IN")
 
@@ -20,7 +20,9 @@ func GenerateJWT(email model.User) (string, error) {
 		log.Panic("Error parsing JWT_EXPIRES_IN")
 	}
 	claims := model.Claims{
-		Email: email.Email,
+		Email:  user.Email,
+		UserID: user.ID,
+		Role:   user.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(expires))),
 		},

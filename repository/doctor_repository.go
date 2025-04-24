@@ -11,7 +11,7 @@ type DoctorRepository interface {
 	GetAllDoctors(limit, offset int) ([]model.Doctor, error)
 	GetDoctorById(id uint) (*model.Doctor, error)
 	UpdateDoctor(doctorID uint, doctor model.Doctor) (*model.Doctor, error)
-	DeleteDoctor(doctorID uint) error
+	DeleteDoctor(doctorID uint, userID uint) error
 }
 
 type DoctorRepositoryImpl struct {
@@ -20,11 +20,12 @@ type DoctorRepositoryImpl struct {
 
 func (r *DoctorRepositoryImpl) CreateDoctor(doctor *model.Doctor) error {
 	tx := r.DB.Begin()
+	defer tx.Commit()
 	if err := tx.Create(doctor).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
-	tx.Commit()
+
 	return nil
 }
 
@@ -33,7 +34,12 @@ func (r *DoctorRepositoryImpl) CreateDoctor(doctor *model.Doctor) error {
 // This function will return a list of doctors with the given limit and offset.
 // If the query is not successful, it will return an error.
 func (r *DoctorRepositoryImpl) GetAllDoctors(limit, offset int) ([]model.Doctor, error) {
+	var totalRows int64
 	var doctors []model.Doctor
+	if err := r.DB.Model(&model.Doctor{}).Count(&totalRows).Error; err != nil {
+		return nil, err
+	}
+
 	if err := r.DB.Limit(limit).Offset(offset).Preload("User").Find(&doctors).Error; err != nil {
 		return nil, err
 	}
@@ -69,6 +75,7 @@ func (r *DoctorRepositoryImpl) GetDoctorById(id uint) (*model.Doctor, error) {
 
 func (r *DoctorRepositoryImpl) UpdateDoctor(doctorID uint, doctor model.Doctor) (*model.Doctor, error) {
 	tx := r.DB.Begin()
+	defer tx.Commit()
 
 	var existingDoctor model.Doctor
 	if err := r.DB.First(&existingDoctor, doctorID).Error; err != nil {
@@ -82,18 +89,30 @@ func (r *DoctorRepositoryImpl) UpdateDoctor(doctorID uint, doctor model.Doctor) 
 		tx.Rollback()
 		return nil, err
 	}
-
-	tx.Commit()
 	return &existingDoctor, nil
 }
 
-func (r *DoctorRepositoryImpl) DeleteDoctor(doctorID uint) error {
+func (r *DoctorRepositoryImpl) DeleteDoctor(doctorID uint, userID uint) error {
 	tx := r.DB.Begin()
+	defer tx.Commit()
+
+	var doctor model.Doctor
+	if err := tx.First(&doctor, doctorID).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	doctor.UpdatedBy = userID
+
+	if err := tx.Save(&doctor).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
 
 	if err := tx.Delete(&model.Doctor{}, doctorID).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
-	tx.Commit()
+
 	return nil
 }

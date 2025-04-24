@@ -17,16 +17,26 @@ type DoctorScheduleService interface {
 
 type DoctorScheduleServiceImpl struct {
 	DoctorScheduleRepository repository.DoctorScheduleRepository
+	DoctorRepository         repository.DoctorRepository
+	ServiceRepository        repository.ServiceRepository
 }
 
 func (ds *DoctorScheduleServiceImpl) CreateDoctorSchedule(doctorSchedule model.DoctorSchedule) (*model.DoctorSchedule, error) {
-	if doctorSchedule.DoctorId == 0 {
-		return nil, errors.New("doctor id is required")
+	if doctorSchedule.DoctorId == 0 || doctorSchedule.ServiceId == 0 || doctorSchedule.Date.IsZero() || doctorSchedule.StartTime.IsZero() || doctorSchedule.EndTime.IsZero() {
+		return nil, errors.New("invalid doctor schedule data")
+	}
+
+	if _, err := ds.DoctorRepository.GetDoctorById(doctorSchedule.DoctorId); err != nil {
+		return nil, errors.New("doctor not found")
+	}
+
+	if _, err := ds.ServiceRepository.GetServiceById(doctorSchedule.ServiceId); err != nil {
+		return nil, errors.New("service not found")
 	}
 
 	existingSchedule, err := ds.DoctorScheduleRepository.GetDoctorSchedulesByDoctorId(doctorSchedule.DoctorId)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("error getting doctor schedules")
 	}
 
 	for _, existing := range existingSchedule {

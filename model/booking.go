@@ -23,11 +23,11 @@ type Booking struct {
 }
 
 type BookingRequest struct {
-	DoctorId    uint      `json:"doctor_id"`
-	ServiceId   uint      `json:"service_id"`
-	BookingDate time.Time `json:"booking_date" time_format:"2006-01-02"`
-	BookingTime time.Time `json:"booking_time" time_format:"15:04"`
-	Notes       string    `json:"notes"`
+	DoctorId    uint   `json:"doctor_id"`
+	ServiceId   uint   `json:"service_id"`
+	BookingDate string `json:"booking_date" time_format:"2006-01-02"`
+	BookingTime string `json:"booking_time" time_format:"15:04"`
+	Notes       string `json:"notes"`
 }
 
 type BookingResponse struct {

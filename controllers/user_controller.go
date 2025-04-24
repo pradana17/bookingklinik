@@ -3,6 +3,7 @@ package controllers
 import (
 	"booking-klinik/model"
 	"booking-klinik/services"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -30,18 +31,19 @@ func (uc *UserController) RegisterUser(c *gin.Context) {
 
 func (uc *UserController) LoginUser(c *gin.Context) {
 	var loginRequest model.LoginRequest
+
 	if err := c.ShouldBindJSON(&loginRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	user, token, err := uc.UserService.LoginUser(loginRequest.Email, loginRequest.Password)
+	token, err := uc.UserService.LoginUser(loginRequest.Email, loginRequest.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Login successful", "user": user, "token": token})
+	c.JSON(http.StatusOK, gin.H{"message": "Login successful", "token": token})
 }
 
 func (uc *UserController) UpdatePassword(c *gin.Context) {
@@ -51,6 +53,8 @@ func (uc *UserController) UpdatePassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	fmt.Println(updatePasswordRequest.OldPassword, updatePasswordRequest.NewPassword, userID)
 
 	err := uc.UserService.UpdatePassword(userID, updatePasswordRequest.OldPassword, updatePasswordRequest.NewPassword)
 	if err != nil {

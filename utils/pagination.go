@@ -8,9 +8,11 @@ import (
 )
 
 type Paginator struct {
-	Limit  int `json:"limit"`
-	Offset int `json:"offset"`
-	Page   int `json:"page"`
+	Limit      int   `json:"limit"`
+	Offset     int   `json:"offset"`
+	Page       int   `json:"page"`
+	TotalRows  int64 `json:"total_rows"`
+	TotalPages int64 `json:"total_pages"`
 }
 
 func Pagination(c *gin.Context) (*Paginator, error) {
@@ -32,6 +34,10 @@ func Pagination(c *gin.Context) (*Paginator, error) {
 	}
 
 	offset := (page - 1) * limit
+
+	if offset < 0 {
+		offset = 0
+	}
 
 	return &Paginator{Limit: limit, Offset: offset, Page: page}, nil
 }
