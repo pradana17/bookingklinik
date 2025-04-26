@@ -11,10 +11,11 @@ import (
 
 type BookingService interface {
 	CreateBooking(booking model.Booking) (*model.Booking, error)
-	GetAllBookings(limit, offset int) ([]model.Booking, *utils.Paginator, error)
-	GetBookingById(id uint) (*model.Booking, error)
-	GetBookingsByUserId(userId uint, limit, offset int) ([]model.Booking, error)
-	GetBookingsByDoctorId(doctorId uint, limit, offset int) ([]model.Booking, error)
+	GetAllBookings(limit, offset int, userRole string, userId uint) ([]model.Booking, *utils.Paginator, error)
+	GetBookingById(id uint, userID uint, userRole string) (*model.Booking, error)
+	GetBookingsByUserId(userId uint, limit, offset int) ([]model.Booking, *utils.Paginator, error)
+	GetBookingsByDoctorId(doctorId uint, limit, offset int) ([]model.Booking, *utils.Paginator, error)
+	GetDoctorName(doctorId uint) (string, error)
 	UpdateBooking(bookingID uint, booking model.Booking, userRole string) (*model.Booking, error)
 	DeleteBooking(bookingID uint, userRole string, userID uint) error
 }
@@ -24,6 +25,7 @@ type BookingServicesImpl struct {
 	DoctorRepository         repository.DoctorRepository
 	ServiceRepository        repository.ServiceRepository
 	DoctorScheduleRepository repository.DoctorScheduleRepository
+	UserRepository           repository.UserRepository
 }
 
 func (s *BookingServicesImpl) CreateBooking(booking model.Booking) (*model.Booking, error) {
@@ -83,32 +85,90 @@ func (s *BookingServicesImpl) CreateBooking(booking model.Booking) (*model.Booki
 
 }
 
-func (s *BookingServicesImpl) GetAllBookings(limit, offset int) ([]model.Booking, *utils.Paginator, error) {
-	bookings, totalRows, err := s.BookingRepository.GetAllBookings(limit, offset)
+func (s *BookingServicesImpl) GetAllBookings(limit, offset int, userRole string, userId uint) ([]model.Booking, *utils.Paginator, error) {
+	var bookings []model.Booking
+	var totalRows int64
+	var err error
+
+	switch userRole {
+	case "patient":
+		bookings, totalRows, err = s.BookingRepository.GetBookingsByUserId(userId, limit, offset)
+	case "doctor":
+		doctorID, err := s.DoctorRepository.GetDoctorIDbyUserID(userId)
+		if err != nil {
+			return nil, nil, err
+		}
+		bookings, totalRows, err = s.BookingRepository.GetBookingsByDoctorId(doctorID, limit, offset)
+		if err != nil {
+			return nil, nil, err
+		}
+	case "admin":
+		bookings, totalRows, err = s.BookingRepository.GetAllBookings(limit, offset)
+	default:
+		return nil, nil, errors.New("invalid user role")
+	}
+
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pagination, err := utils.Pagination(nil)
-	if err != nil {
-		return nil, nil, err
-	}
+	pagination := &utils.Paginator{Limit: limit, Offset: offset, Page: (offset / limit) + 1, TotalRows: totalRows}
 
-	pagination.TotalRows = totalRows
 	pagination.TotalPages = (totalRows + int64(pagination.Limit) - 1) / int64(pagination.Limit)
 	return bookings, pagination, nil
 }
 
-func (s *BookingServicesImpl) GetBookingById(id uint) (*model.Booking, error) {
-	return s.BookingRepository.GetBookingById(id)
+func (s *BookingServicesImpl) GetBookingById(id uint, userID uint, userRole string) (*model.Booking, error) {
+	if userRole == "patient" {
+		booking, err := s.BookingRepository.GetBookingById(id)
+		if err != nil {
+			return nil, err
+		}
+		if booking.UserId != userID {
+			return nil, errors.New("you can only access your own bookings")
+		}
+		return booking, nil
+	} else if userRole == "doctor" {
+		doctorID, err := s.DoctorRepository.GetDoctorIDbyUserID(userID)
+		if err != nil {
+			return nil, err
+		}
+		booking, err := s.BookingRepository.GetBookingById(id)
+		if err != nil {
+			return nil, err
+		}
+		if booking.DoctorId != doctorID {
+			return nil, errors.New("you can only access your patients bookings")
+		}
+		return booking, nil
+	} else if userRole == "admin" {
+		return s.BookingRepository.GetBookingById(id)
+	}
+	return nil, errors.New("invalid user role")
 }
 
-func (s *BookingServicesImpl) GetBookingsByUserId(userId uint, limit, offset int) ([]model.Booking, error) {
-	return s.BookingRepository.GetBookingsByUserId(userId, limit, offset)
+func (s *BookingServicesImpl) GetBookingsByUserId(userId uint, limit, offset int) ([]model.Booking, *utils.Paginator, error) {
+	bookings, totalRows, err := s.BookingRepository.GetBookingsByUserId(userId, limit, offset)
+	if err != nil {
+		return nil, nil, err
+	}
+	pagination := &utils.Paginator{Limit: limit, Offset: offset, Page: (offset / limit) + 1, TotalRows: totalRows}
+
+	pagination.TotalPages = (totalRows + int64(pagination.Limit) - 1) / int64(pagination.Limit)
+	return bookings, pagination, nil
 }
 
-func (s *BookingServicesImpl) GetBookingsByDoctorId(doctorId uint, limit, offset int) ([]model.Booking, error) {
-	return s.BookingRepository.GetBookingsByDoctorId(doctorId, limit, offset)
+func (s *BookingServicesImpl) GetBookingsByDoctorId(doctorId uint, limit, offset int) ([]model.Booking, *utils.Paginator, error) {
+	booking, totalRows, err := s.BookingRepository.GetBookingsByDoctorId(doctorId, limit, offset)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pagination := &utils.Paginator{Limit: limit, Offset: offset, Page: (offset / limit) + 1, TotalRows: totalRows}
+
+	pagination.TotalPages = (totalRows + int64(pagination.Limit) - 1) / int64(pagination.Limit)
+
+	return booking, pagination, nil
 }
 
 func (s *BookingServicesImpl) UpdateBooking(bookingID uint, booking model.Booking, userRole string) (*model.Booking, error) {
@@ -191,4 +251,17 @@ func (s *BookingServicesImpl) CheckBookingConflict(doctorId uint, bookingDate ti
 	}
 
 	return false, time.Time{}, nil
+}
+
+func (s *BookingServicesImpl) GetDoctorName(doctorId uint) (string, error) {
+	doctor, err := s.DoctorRepository.GetDoctorById(doctorId)
+	if err != nil {
+		return "", err
+	}
+
+	user, err := s.UserRepository.GetUserById(doctor.UserId)
+	if err != nil {
+		return "", err
+	}
+	return user.Name, nil
 }

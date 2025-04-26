@@ -4,6 +4,7 @@ import (
 	"booking-klinik/model"
 	"booking-klinik/repository"
 	"errors"
+	"time"
 )
 
 type DoctorScheduleService interface {
@@ -26,6 +27,10 @@ func (ds *DoctorScheduleServiceImpl) CreateDoctorSchedule(doctorSchedule model.D
 		return nil, errors.New("invalid doctor schedule data")
 	}
 
+	if doctorSchedule.Date.Before(time.Now()) {
+		return nil, errors.New("date must be in the future")
+	}
+
 	if _, err := ds.DoctorRepository.GetDoctorById(doctorSchedule.DoctorId); err != nil {
 		return nil, errors.New("doctor not found")
 	}
@@ -40,11 +45,11 @@ func (ds *DoctorScheduleServiceImpl) CreateDoctorSchedule(doctorSchedule model.D
 	}
 
 	for _, existing := range existingSchedule {
-		if existing.Date == doctorSchedule.Date {
+		if existing.Date.Equal(doctorSchedule.Date) && existing.ServiceId == doctorSchedule.ServiceId {
 			existingStart, existingEnd := existing.StartTime, existing.EndTime
 			newStart, newEnd := doctorSchedule.StartTime, doctorSchedule.EndTime
 
-			if (newStart.Before(existingEnd) && newEnd.After(existingStart)) || (existingStart.Before(newEnd) && existingEnd.After(newStart)) {
+			if (newStart.Before(existingEnd) && newEnd.After(existingStart)) || (existingStart.Before(newEnd) && existingEnd.After(newStart)) || (newStart.Equal(existingStart) && newEnd.Equal(existingEnd)) || (existingStart.Equal(newStart) || existingEnd.Equal(newEnd)) {
 				return nil, errors.New("doctor schedule already exists")
 			}
 		}

@@ -16,6 +16,11 @@ type User struct {
 	Booking   []Booking `json:"-" gorm:"foreignKey:UserId"`
 }
 
+type UserResponse struct {
+	ID    uint   `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
 type Claims struct {
 	UserID uint   `json:"user_id"`
 	Email  string `json:"email"`

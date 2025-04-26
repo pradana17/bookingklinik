@@ -32,6 +32,7 @@ type BookingRequest struct {
 
 type BookingResponse struct {
 	ID          uint      `json:"id"`
+	PatientName string    `json:"patient_name"`
 	DoctorName  string    `json:"doctor_name"`
 	ServiceName string    `json:"service_name"`
 	BookingDate time.Time `json:"booking_date" time_format:"2006-01-02"`

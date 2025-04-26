@@ -2,6 +2,7 @@ package repository
 
 import (
 	"booking-klinik/model"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -11,8 +12,8 @@ type BookingRepository interface {
 	CreateBooking(booking *model.Booking) error
 	GetAllBookings(limit, offset int) ([]model.Booking, int64, error)
 	GetBookingById(id uint) (*model.Booking, error)
-	GetBookingsByUserId(userId uint, limit, offset int) ([]model.Booking, error)
-	GetBookingsByDoctorId(doctorId uint, limit, offset int) ([]model.Booking, error)
+	GetBookingsByUserId(userId uint, limit, offset int) ([]model.Booking, int64, error)
+	GetBookingsByDoctorId(doctorId uint, limit, offset int) ([]model.Booking, int64, error)
 	GetBookingsByDoctorAndDate(doctorId uint, bookingDate time.Time) ([]model.Booking, error)
 	UpdateBooking(bookingID uint, booking model.Booking) (*model.Booking, error)
 	DeleteBooking(bookingID uint, userID uint) error
@@ -48,7 +49,7 @@ func (r *BookingRepositoryImpl) GetAllBookings(limit, offset int) ([]model.Booki
 		return nil, 0, err
 	}
 
-	if err := r.DB.Limit(limit).Offset(offset).Find(&bookings).Error; err != nil {
+	if err := r.DB.Limit(limit).Offset(offset).Preload("User").Preload("Service").Find(&bookings).Error; err != nil {
 		return nil, 0, err
 	}
 	return bookings, totalRows, nil
@@ -56,26 +57,35 @@ func (r *BookingRepositoryImpl) GetAllBookings(limit, offset int) ([]model.Booki
 
 func (r *BookingRepositoryImpl) GetBookingById(id uint) (*model.Booking, error) {
 	var booking model.Booking
-	if err := r.DB.First(&booking, id).Error; err != nil {
+	if err := r.DB.Preload("User").Preload("Service").First(&booking, id).Error; err != nil {
 		return nil, err
 	}
 	return &booking, nil
 }
 
-func (r *BookingRepositoryImpl) GetBookingsByUserId(userId uint, limit, offset int) ([]model.Booking, error) {
+func (r *BookingRepositoryImpl) GetBookingsByUserId(userId uint, limit, offset int) ([]model.Booking, int64, error) {
 	var bookings []model.Booking
-	if err := r.DB.Preload("Doctor").Preload("Service").Where("user_id = ?", userId).Limit(limit).Offset(offset).Find(&bookings).Error; err != nil {
-		return nil, err
+	var totalRows int64
+	if err := r.DB.Model(&model.Booking{}).Where("user_id = ?", userId).Count(&totalRows).Error; err != nil {
+		return nil, 0, err
 	}
-	return bookings, nil
+	if err := r.DB.Preload("Doctor").Preload("User").Preload("Service").Where("user_id = ?", userId).Limit(limit).Offset(offset).Find(&bookings).Error; err != nil {
+		return nil, 0, err
+	}
+	return bookings, totalRows, nil
 }
 
-func (r *BookingRepositoryImpl) GetBookingsByDoctorId(doctorId uint, limit, offset int) ([]model.Booking, error) {
+func (r *BookingRepositoryImpl) GetBookingsByDoctorId(doctorId uint, limit, offset int) ([]model.Booking, int64, error) {
 	var bookings []model.Booking
-	if err := r.DB.Preload("User").Preload("Service").Where("doctor_id = ?", doctorId).Limit(limit).Offset(offset).Find(&bookings).Error; err != nil {
-		return nil, err
+	var totalRows int64
+	if err := r.DB.Model(&model.Booking{}).Where("doctor_id = ?", doctorId).Count(&totalRows).Error; err != nil {
+		return nil, 0, err
 	}
-	return bookings, nil
+	if err := r.DB.Preload("Doctor").Preload("User").Preload("Service").Where("doctor_id = ?", doctorId).Limit(limit).Offset(offset).Find(&bookings).Error; err != nil {
+		return nil, 0, err
+	}
+	fmt.Println(doctorId)
+	return bookings, totalRows, nil
 }
 
 func (r *BookingRepositoryImpl) UpdateBooking(bookingID uint, booking model.Booking) (*model.Booking, error) {

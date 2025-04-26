@@ -71,11 +71,11 @@ func (r *DoctorScheduleRepositoryImpl) UpdateDoctorSchedule(doctorSchedule *mode
 	return nil
 }
 
-func (r *DoctorScheduleRepositoryImpl) DeleteDoctorSchedule(scheduleId uint, userID uint) error {
+func (r *DoctorScheduleRepositoryImpl) DeleteDoctorSchedule(id uint, userID uint) error {
 	var doctorSchedule model.DoctorSchedule
 	tx := r.DB.Begin()
 
-	if err := tx.First(&doctorSchedule, scheduleId).Error; err != nil {
+	if err := tx.First(&doctorSchedule, id).Error; err != nil {
 		tx.Rollback()
 		return err
 	}
@@ -91,6 +91,8 @@ func (r *DoctorScheduleRepositoryImpl) DeleteDoctorSchedule(scheduleId uint, use
 		tx.Rollback()
 		return err
 	}
+
+	tx.Commit()
 	return nil
 }
 

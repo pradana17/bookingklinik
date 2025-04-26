@@ -3,7 +3,6 @@ package controllers
 import (
 	"booking-klinik/model"
 	"booking-klinik/services"
-	"booking-klinik/utils"
 	"net/http"
 	"strconv"
 	"time"
@@ -13,6 +12,10 @@ import (
 
 type BookingController struct {
 	BookingService services.BookingService
+	DoctorService  services.DoctorServices
+	UserService    services.UserService
+	ServiceService services.ServiceService
+	DoctorSchedule services.DoctorScheduleService
 }
 
 func (bc *BookingController) CreateBooking(c *gin.Context) {
@@ -35,7 +38,6 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid time format"})
 		return
 	}
-
 	userID := c.MustGet("userID").(uint)
 
 	newBooking := model.Booking{
@@ -50,6 +52,18 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 		UpdatedBy:   userID,
 	}
 
+	doctor, err := bc.DoctorService.GetDoctorById(bookingRequest.DoctorId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := bc.UserService.GetUserById(doctor.UserId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	createdBooking, err := bc.BookingService.CreateBooking(newBooking)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -58,7 +72,8 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 
 	bookingResponse := model.BookingResponse{
 		ID:          createdBooking.ID,
-		DoctorName:  createdBooking.User.Name,
+		PatientName: createdBooking.User.Name,
+		DoctorName:  user.Name,
 		ServiceName: createdBooking.Service.Name,
 		BookingDate: createdBooking.BookingDate,
 		BookingTime: createdBooking.BookingTime,
@@ -70,13 +85,25 @@ func (bc *BookingController) CreateBooking(c *gin.Context) {
 }
 
 func (bc *BookingController) GetAllBookings(c *gin.Context) {
-	paginator, err := utils.Pagination(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	limitStr := c.DefaultQuery("limit", "10")
+	pageStr := c.DefaultQuery("page", "1")
+
+	userRole := c.MustGet("role").(string)
+	userID := c.MustGet("userID").(uint)
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 10
 	}
 
-	bookings, pagination, err := bc.BookingService.GetAllBookings(paginator.Limit, paginator.Offset)
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1
+	}
+
+	offset := (page - 1) * limit
+
+	bookings, pagination, err := bc.BookingService.GetAllBookings(limit, offset, userRole, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -84,9 +111,23 @@ func (bc *BookingController) GetAllBookings(c *gin.Context) {
 
 	var bookingResponses []model.BookingResponse
 	for _, booking := range bookings {
+
+		doctor, err := bc.DoctorService.GetDoctorById(booking.DoctorId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch doctor details"})
+			return
+		}
+
+		// Ambil nama user (dokter) berdasarkan UserId dokter
+		doc, err := bc.UserService.GetUserById(doctor.UserId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch doctor user details"})
+			return
+		}
 		bookingResponses = append(bookingResponses, model.BookingResponse{
 			ID:          booking.ID,
-			DoctorName:  booking.User.Name,
+			PatientName: booking.User.Name,
+			DoctorName:  doc.Name,
 			ServiceName: booking.Service.Name,
 			BookingDate: booking.BookingDate,
 			BookingTime: booking.BookingTime,
@@ -105,13 +146,27 @@ func (bc *BookingController) GetAllBookings(c *gin.Context) {
 
 func (bc *BookingController) GetBookingsById(c *gin.Context) {
 	bookingId := c.Param("id")
+	userID := c.MustGet("userID").(uint)
+	userRole := c.MustGet("role").(string)
 	bookingIdUint, err := strconv.ParseUint(bookingId, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid booking ID"})
 		return
 	}
 
-	booking, err := bc.BookingService.GetBookingById(uint(bookingIdUint))
+	booking, err := bc.BookingService.GetBookingById(uint(bookingIdUint), userID, userRole)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	doctor, err := bc.DoctorService.GetDoctorById(booking.DoctorId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := bc.UserService.GetUserById(doctor.UserId)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -119,7 +174,8 @@ func (bc *BookingController) GetBookingsById(c *gin.Context) {
 
 	bookingResponse := model.BookingResponse{
 		ID:          booking.ID,
-		DoctorName:  booking.User.Name,
+		PatientName: booking.User.Name,
+		DoctorName:  user.Name,
 		ServiceName: booking.Service.Name,
 		BookingDate: booking.BookingDate,
 		BookingTime: booking.BookingTime,
@@ -131,15 +187,28 @@ func (bc *BookingController) GetBookingsById(c *gin.Context) {
 }
 
 func (bc *BookingController) GetBookingsByUserId(c *gin.Context) {
-	userID := c.MustGet("userID").(uint)
+	limitStr := c.DefaultQuery("limit", "10")
+	pageStr := c.DefaultQuery("page", "1")
+	userID := c.Param("user_id")
 
-	paginator, err := utils.Pagination(c)
+	userIDUint, err := strconv.ParseUint(userID, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
 		return
 	}
 
-	bookings, err := bc.BookingService.GetBookingsByUserId(userID, paginator.Limit, paginator.Offset)
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 10
+	}
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1
+	}
+
+	offset := (page - 1) * limit
+	bookings, pagination, err := bc.BookingService.GetBookingsByUserId(uint(userIDUint), limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -147,9 +216,21 @@ func (bc *BookingController) GetBookingsByUserId(c *gin.Context) {
 
 	var bookingResponses []model.BookingResponse
 	for _, booking := range bookings {
+		doctor, err := bc.DoctorService.GetDoctorById(booking.DoctorId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		user, err := bc.UserService.GetUserById(doctor.UserId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		bookingResponses = append(bookingResponses, model.BookingResponse{
 			ID:          booking.ID,
-			DoctorName:  booking.User.Name,
+			PatientName: booking.User.Name,
+			DoctorName:  user.Name,
 			ServiceName: booking.Service.Name,
 			BookingDate: booking.BookingDate,
 			BookingTime: booking.BookingTime,
@@ -158,24 +239,33 @@ func (bc *BookingController) GetBookingsByUserId(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"bookings": bookingResponses})
+	c.JSON(http.StatusOK, gin.H{"data": bookingResponses, "total_rows": pagination.TotalRows, "total_pages": pagination.TotalPages, "current_page": pagination.Page, "limit": pagination.Limit})
 }
 
 func (bc *BookingController) GetBookingsByDoctorId(c *gin.Context) {
-	doctorId := c.Param("id")
+	limitStr := c.DefaultQuery("limit", "10")
+	pageStr := c.DefaultQuery("page", "1")
+	doctorId := c.Param("doctor_id")
 	doctorIdUint, err := strconv.ParseUint(doctorId, 10, 32)
+
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid doctor ID"})
 		return
 	}
 
-	paginator, err := utils.Pagination(c)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 10
 	}
 
-	bookings, err := bc.BookingService.GetBookingsByDoctorId(uint(doctorIdUint), paginator.Limit, paginator.Offset)
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1
+	}
+
+	offset := (page - 1) * limit
+
+	bookings, pagination, err := bc.BookingService.GetBookingsByDoctorId(uint(doctorIdUint), limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -183,9 +273,21 @@ func (bc *BookingController) GetBookingsByDoctorId(c *gin.Context) {
 
 	var bookingResponses []model.BookingResponse
 	for _, booking := range bookings {
+		doctor, err := bc.DoctorService.GetDoctorById(booking.DoctorId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		user, err := bc.UserService.GetUserById(doctor.UserId)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 		bookingResponses = append(bookingResponses, model.BookingResponse{
 			ID:          booking.ID,
-			DoctorName:  booking.User.Name,
+			PatientName: booking.User.Name,
+			DoctorName:  user.Name,
 			ServiceName: booking.Service.Name,
 			BookingDate: booking.BookingDate,
 			BookingTime: booking.BookingTime,
@@ -194,7 +296,7 @@ func (bc *BookingController) GetBookingsByDoctorId(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"bookings": bookingResponses})
+	c.JSON(http.StatusOK, gin.H{"data": bookingResponses, "total_rows": pagination.TotalRows, "total_pages": pagination.TotalPages, "current_page": pagination.Page, "limit": pagination.Limit})
 }
 
 func (bc *BookingController) UpdateBooking(c *gin.Context) {
@@ -211,7 +313,7 @@ func (bc *BookingController) UpdateBooking(c *gin.Context) {
 		return
 	}
 
-	userRole := c.MustGet("userRole").(string)
+	userRole := c.MustGet("role").(string)
 
 	updatedBooking, err := bc.BookingService.UpdateBooking(uint(bookingIdUint), model.Booking{
 		Notes:       updateRequest.Notes,
@@ -225,10 +327,21 @@ func (bc *BookingController) UpdateBooking(c *gin.Context) {
 		return
 	}
 
+	doctor, err := bc.DoctorService.GetDoctorById(updatedBooking.DoctorId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	user, err := bc.UserService.GetUserById(doctor.UserId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	bookingResponse := model.BookingResponse{
 		ID:          updatedBooking.ID,
-		DoctorName:  updatedBooking.User.Name,
-		ServiceName: updatedBooking.Service.Name,
+		DoctorName:  user.Name,
 		BookingDate: updatedBooking.BookingDate,
 		BookingTime: updatedBooking.BookingTime,
 		Status:      updatedBooking.Status,
@@ -246,7 +359,7 @@ func (bc *BookingController) DeleteBooking(c *gin.Context) {
 		return
 	}
 
-	userRole := c.MustGet("userRole").(string)
+	userRole := c.MustGet("role").(string)
 	userID := c.MustGet("userID").(uint)
 
 	err = bc.BookingService.DeleteBooking(uint(bookingIdUint), userRole, userID)

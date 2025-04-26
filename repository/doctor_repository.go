@@ -8,8 +8,9 @@ import (
 
 type DoctorRepository interface {
 	CreateDoctor(doctor *model.Doctor) error
-	GetAllDoctors(limit, offset int) ([]model.Doctor, error)
+	GetAllDoctors(limit, offset int) ([]model.Doctor, int64, error)
 	GetDoctorById(id uint) (*model.Doctor, error)
+	GetDoctorIDbyUserID(userID uint) (uint, error)
 	UpdateDoctor(doctorID uint, doctor model.Doctor) (*model.Doctor, error)
 	DeleteDoctor(doctorID uint, userID uint) error
 }
@@ -33,17 +34,17 @@ func (r *DoctorRepositoryImpl) CreateDoctor(doctor *model.Doctor) error {
 //
 // This function will return a list of doctors with the given limit and offset.
 // If the query is not successful, it will return an error.
-func (r *DoctorRepositoryImpl) GetAllDoctors(limit, offset int) ([]model.Doctor, error) {
+func (r *DoctorRepositoryImpl) GetAllDoctors(limit, offset int) ([]model.Doctor, int64, error) {
 	var totalRows int64
 	var doctors []model.Doctor
 	if err := r.DB.Model(&model.Doctor{}).Count(&totalRows).Error; err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	if err := r.DB.Limit(limit).Offset(offset).Preload("User").Find(&doctors).Error; err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return doctors, nil
+	return doctors, totalRows, nil
 }
 
 // GetDoctorById gets a doctor by given ID.
@@ -115,4 +116,12 @@ func (r *DoctorRepositoryImpl) DeleteDoctor(doctorID uint, userID uint) error {
 	}
 
 	return nil
+}
+
+func (r *DoctorRepositoryImpl) GetDoctorIDbyUserID(userID uint) (uint, error) {
+	var doctor model.Doctor
+	if err := r.DB.Preload("User").First(&doctor, "user_id = ?", userID).Error; err != nil {
+		return 0, err
+	}
+	return doctor.ID, nil
 }

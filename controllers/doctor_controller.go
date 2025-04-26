@@ -3,8 +3,6 @@ package controllers
 import (
 	"booking-klinik/model"
 	"booking-klinik/services"
-	"booking-klinik/utils"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -43,27 +41,25 @@ func (dc *DoctorController) CreateDoctor(c *gin.Context) {
 }
 
 func (dc *DoctorController) GetAllDoctors(c *gin.Context) {
-	fmt.Println("test")
-	paginator, err := utils.Pagination(c)
-	fmt.Println("test2")
-	if err != nil {
-
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	limitStr := c.DefaultQuery("limit", "10")
+	pageStr := c.DefaultQuery("page", "1")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 10
 	}
 
-	fmt.Println(paginator.Limit)
-	fmt.Println(paginator.Offset)
-	fmt.Println(paginator.Page)
-	fmt.Println("test2")
-	doctors, err := dc.DoctorService.GetAllDoctors(paginator.Limit, paginator.Offset)
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1
+	}
+
+	offset := (page - 1) * limit
+
+	doctors, pagination, err := dc.DoctorService.GetAllDoctors(limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	/*
-		paginator.TotalRows = totalRows
-		paginator.TotalPages = (totalRows + int64(paginator.Limit) - 1) / int64(paginator.Limit)*/
 	var doctorResponses []model.DoctorResponse
 	for _, doctor := range doctors {
 		doctorResponses = append(doctorResponses, model.DoctorResponse{
@@ -75,10 +71,10 @@ func (dc *DoctorController) GetAllDoctors(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"data":         doctorResponses,
-		"total_rows":   paginator.TotalRows,
-		"total_pages":  paginator.TotalPages,
-		"current_page": paginator.Page,
-		"limit":        paginator.Limit,
+		"total_rows":   pagination.TotalRows,
+		"total_pages":  pagination.TotalPages,
+		"current_page": pagination.Page,
+		"limit":        pagination.Limit,
 	})
 }
 

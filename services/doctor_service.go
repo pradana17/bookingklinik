@@ -3,13 +3,14 @@ package services
 import (
 	"booking-klinik/model"
 	"booking-klinik/repository"
+	"booking-klinik/utils"
 	"errors"
 	"fmt"
 )
 
 type DoctorServices interface {
 	CreateDoctor(doctor *model.Doctor) (*model.Doctor, error)
-	GetAllDoctors(limit, offset int) ([]model.Doctor, error)
+	GetAllDoctors(limit, offset int) ([]model.Doctor, *utils.Paginator, error)
 	GetDoctorById(id uint) (*model.Doctor, error)
 	UpdateDoctor(doctorID uint, doctor model.Doctor) (*model.Doctor, error)
 	DeleteDoctor(doctorID uint, userID uint) error
@@ -18,6 +19,7 @@ type DoctorServices interface {
 type DoctorServicesImpl struct {
 	DoctorRepository repository.DoctorRepository
 	UserRepository   repository.UserRepository
+	BookingService   repository.BookingRepository
 }
 
 func (s *DoctorServicesImpl) CreateDoctor(doctor *model.Doctor) (*model.Doctor, error) {
@@ -42,15 +44,17 @@ func (s *DoctorServicesImpl) CreateDoctor(doctor *model.Doctor) (*model.Doctor, 
 	return doctor, nil
 }
 
-func (s *DoctorServicesImpl) GetAllDoctors(limit, offset int) ([]model.Doctor, error) {
-	doctors, err := s.DoctorRepository.GetAllDoctors(limit, offset)
+func (s *DoctorServicesImpl) GetAllDoctors(limit, offset int) ([]model.Doctor, *utils.Paginator, error) {
+	var totalRows int64
+	doctors, totalRows, err := s.DoctorRepository.GetAllDoctors(limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	/*
-		pagination.TotalRows = totalRows
-		pagination.TotalPages = (totalRows + int64(pagination.Limit) - 1) / int64(pagination.Limit)*/
-	return doctors, nil
+
+	pagination := &utils.Paginator{Limit: limit, Offset: offset, Page: (offset / limit) + 1, TotalRows: totalRows}
+
+	pagination.TotalPages = (totalRows + int64(pagination.Limit) - 1) / int64(pagination.Limit)
+	return doctors, pagination, nil
 }
 
 func (s *DoctorServicesImpl) GetDoctorById(id uint) (*model.Doctor, error) {

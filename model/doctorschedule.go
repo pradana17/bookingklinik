@@ -10,7 +10,7 @@ type DoctorSchedule struct {
 	gorm.Model
 	DoctorId  uint      `json:"doctor_id" gorm:"not null"`
 	ServiceId uint      `json:"service_id" gorm:"not null"`
-	Date      time.Time `json:"date" time_format:"YYYY-MM-DD" gorm:"not null;index;uniqueIndex:idx_doctorschedule_date"`
+	Date      time.Time `json:"date" time_format:"YYYY-MM-DD" gorm:"not null"`
 	StartTime time.Time `json:"start_time" time_format:"15:04" gorm:"not null"`
 	EndTime   time.Time `json:"end_time" time_format:"15:04" gorm:"not null"`
 	CreatedBy uint      `json:"created_by" gorm:"not null"`
