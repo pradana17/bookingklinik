@@ -91,12 +91,12 @@ All endpoints that require authentication use **JWT tokens** for validation. You
 | **Endpoint**                  | **Method** | **Description**                                    | **Authentication** | **Roles**  |
 |-------------------------------|------------|----------------------------------------------------|--------------------|------------|
 | `/booking`                     | POST       | Create a new booking                              | Required JWT       | Patient    |
-| `/booking`                     | GET        | Get all bookings                                  | Required JWT       | Patient    |
-| `/booking/:id`                 | GET        | Get booking by ID                                 | Required JWT       | Patient    |
-| `/booking/user/:user_id`       | GET        | Get bookings by user ID                           | Required JWT       | Patient    |
-| `/booking/doctor/:doctor_id`   | GET        | Get bookings by doctor ID                         | Required JWT       | Patient    |
-| `/booking/:id`                 | PUT        | Update booking by ID                              | Required JWT       | Patient    |
-| `/booking/:id`                 | DELETE     | Delete booking by ID                              | Required JWT       | Patient    |
+| `/booking`                     | GET        | Get all bookings                                  | Required JWT       | All Users    |
+| `/booking/:id`                 | GET        | Get booking by ID                                 | Required JWT       | All Users    |
+| `/booking/user/:user_id`       | GET        | Get bookings by user ID                           | Required JWT       | Admin,Patient    |
+| `/booking/doctor/:doctor_id`   | GET        | Get bookings by doctor ID                         | Required JWT       | Admin,Doctor    |
+| `/booking/:id`                 | PUT        | Update booking by ID                              | Required JWT       | Admin, Patient   |
+| `/booking/:id`                 | DELETE     | Delete booking by ID                              | Required JWT       | Admin    |
 
 ### Doctor Routes
 
